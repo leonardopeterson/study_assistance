@@ -301,7 +301,11 @@ export function Dashboard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: item.id, action }),
       });
-      setForm((f) => (f?.entry?.id === item.id ? { ...f, entry: synced } : f));
+      setForm((f) =>
+        f?.entry?.id === item.id
+          ? { ...f, entry: synced, key: action === "pull" ? f.key + 1 : f.key }
+          : f,
+      );
       await refresh();
       setNotice(
         action === "unlink"
