@@ -8,3 +8,6 @@ test-results/
 .vercel/
 work/
 outputs/
+
+# Google credential JSON files: never commit.
+*[sS][eE][cC][rR][eE][tT]*.json

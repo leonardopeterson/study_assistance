@@ -8,3 +8,6 @@ docs/
 *.tsbuildinfo
 work/
 outputs/
+
+# Google credential JSON files: never upload.
+*[sS][eE][cC][rR][eE][tT]*.json
