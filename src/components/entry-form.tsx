@@ -9,6 +9,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { IntegrationSwitch } from "@/components/ui/integration-switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,7 +51,7 @@ export function EntryForm({
   initial?: Entry;
   kind: EntryInput["kind"];
   subjects: Entry[];
-  save: (data: EntryInput, id?: string) => Promise<void>;
+  save: (data: EntryInput, id?: string, integration?: boolean) => Promise<void>;
   upload: (form: FormData) => Promise<void>;
   preview: boolean;
   actions?: React.ReactNode;
@@ -67,6 +68,7 @@ export function EntryForm({
   const [file, setFile] = useState<File>();
   const [fileId, setFileId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [integration, setIntegration] = useState(true);
   const [error, setError] = useState("");
   // The parent keys this form on each opening so draft state never leaks between records.
   const activeKind = initial ? initial.kind : value.kind;
@@ -102,7 +104,7 @@ export function EntryForm({
                 startsAt: starts ? new Date(starts).toISOString() : null,
                 endsAt: ends ? new Date(ends).toISOString() : null,
               });
-              if (activeKind === "material" && !initial) {
+              if (activeKind === "material" && !initial && integration) {
                 const form = new FormData();
                 form.set("title", data.title);
                 form.set("subjectId", data.subjectId ?? "");
@@ -110,7 +112,12 @@ export function EntryForm({
                 form.set("fileId", fileId);
                 if (file) form.set("file", file);
                 await upload(form);
-              } else await save(data, initial?.id);
+              } else
+                await save(
+                  data,
+                  initial?.id,
+                  !initial && activeKind === "event" && integration,
+                );
               close();
             } catch (err) {
               setError(
@@ -344,7 +351,24 @@ export function EntryForm({
                 </div>
               </>
             )}
-            {activeKind === "material" && !initial && (
+            {!initial && ["event", "material"].includes(activeKind) && (
+              <div className="full">
+                <IntegrationSwitch
+                  label={`Adicionar também ao Google ${activeKind === "event" ? "Calendar" : "Drive"}`}
+                  checked={integration}
+                  onCheckedChange={setIntegration}
+                  disabled={busy}
+                  description={
+                    integration
+                      ? "O registro será vinculado à integração."
+                      : activeKind === "material"
+                        ? "Salva apenas o título e as anotações, sem enviar arquivo."
+                        : "O compromisso ficará apenas no Assistance."
+                  }
+                />
+              </div>
+            )}
+            {activeKind === "material" && !initial && integration && (
               <div className="full">
                 <Label htmlFor="file">Arquivo (até 3 MB)</Label>
                 <Input
@@ -399,7 +423,9 @@ export function EntryForm({
             </Button>
             <Button
               type="submit"
-              disabled={busy || (preview && activeKind === "material")}
+              disabled={
+                busy || (preview && activeKind === "material" && integration)
+              }
             >
               {busy ? "Salvando..." : "Salvar registro"}
             </Button>

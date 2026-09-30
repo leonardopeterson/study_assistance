@@ -36,9 +36,17 @@ test("interface conectada grava no Neon e recupera após recarregar", async ({
     await expect(page.getByText("Prévia local", { exact: false })).toHaveCount(
       0,
     );
+    await page.getByRole("button", { name: "Abrir menu do perfil" }).click();
     await expect(
-      page.getByRole("button", { name: "Sair", exact: true }),
+      page.getByRole("menuitem", { name: "Perfil", exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: "Configurações", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: "Sair", exact: true }),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Adicionar", exact: true }).click();
     await page.getByLabel("Título", { exact: true }).fill(title);
     await page

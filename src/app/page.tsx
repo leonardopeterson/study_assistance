@@ -65,6 +65,7 @@ export default async function Home() {
   return (
     <Dashboard
       mode="connected"
+      email={session.user.email}
       name={session.user.name?.split(" ")[0] ?? "Leonardo"}
       signOutAction={async () => {
         "use server";

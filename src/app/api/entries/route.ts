@@ -11,10 +11,6 @@ export async function POST(req: Request) {
     checkOrigin(req);
     const owner = await requireOwner();
     const data = entryInput.parse(await req.json());
-    if (data.kind === "material")
-      throw new (await import("@/lib/server")).AppError(
-        "Envie o material pela integração Drive",
-      );
     await validateSubject(owner, data);
     const [row] = await db()
       .insert(entries)

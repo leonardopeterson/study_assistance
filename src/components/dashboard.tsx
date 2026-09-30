@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { DropdownMenu } from "radix-ui";
+import { IntegrationSwitch } from "@/components/ui/integration-switch";
 import {
   Sparkle,
   LayoutDashboard,
@@ -19,6 +21,8 @@ import {
   SlidersHorizontal,
   Settings2,
   LogOut,
+  UserRound,
+  ChevronUp,
   ExternalLink,
   Link2,
   RefreshCw,
@@ -94,11 +98,13 @@ function localEntry(data: EntryInput, id = crypto.randomUUID()): Entry {
 export function Dashboard({
   mode,
   name,
+  email,
   signOutAction,
   connectAction,
 }: {
   mode: "preview" | "connected";
   name: string;
+  email?: string;
   signOutAction?: () => Promise<void>;
   connectAction?: () => Promise<void>;
 }) {
@@ -116,6 +122,8 @@ export function Dashboard({
   const [form, setForm] = useState<FormState | null>(null);
   const [deleting, setDeleting] = useState<Entry | null>(null);
   const [settings, setSettings] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [deleteIntegration, setDeleteIntegration] = useState(true);
   const [mobileNav, setMobileNav] = useState(false);
   const [mobileSearch, setMobileSearch] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
@@ -213,7 +221,7 @@ export function Dashboard({
     setMobileNav(false);
     setFilter("all");
   }
-  async function save(data: EntryInput, id?: string) {
+  async function save(data: EntryInput, id?: string, integration = false) {
     if (preview) {
       setItems((prev) =>
         id
@@ -233,6 +241,23 @@ export function Dashboard({
       setItems((prev) =>
         id ? prev.map((e) => (e.id === id ? item : e)) : [item, ...prev],
       );
+      if (!id && data.kind === "event" && integration) {
+        try {
+          const synced = await request("/api/calendar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: item.id, action: "push" }),
+          });
+          setItems((prev) =>
+            prev.map((entry) => (entry.id === item.id ? synced : entry)),
+          );
+        } catch (error) {
+          setError(
+            `Registro salvo no Assistance, mas não enviado ao Calendar: ${error instanceof Error ? error.message : "Falha na integração"}. Abra o compromisso para tentar novamente.`,
+          );
+          return;
+        }
+      }
     }
     setNotice("Registro salvo");
   }
@@ -278,10 +303,20 @@ export function Dashboard({
           items.some((e) => e.subjectId === deleting.id)
         )
           throw new Error("Remova os vínculos da matéria antes de excluí-la");
-      } else await request(`/api/entries/${deleting.id}`, { method: "DELETE" });
+      } else
+        await request(
+          `/api/entries/${deleting.id}?integration=${deleteIntegration ? "delete" : "keep"}`,
+          { method: "DELETE" },
+        );
       setItems((prev) => prev.filter((e) => e.id !== deleting.id));
       setDeleting(null);
-      setNotice("Registro excluído. Arquivos no Drive são preservados.");
+      setNotice(
+        deleteIntegration && deleting.driveFileId
+          ? "Registro excluído. Arquivo movido para a lixeira do Drive."
+          : deleteIntegration && deleting.googleEventId
+            ? "Registro e evento do Calendar excluídos."
+            : "Registro excluído do Assistance.",
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao excluir");
       setDeleting(null);
@@ -347,40 +382,42 @@ export function Dashboard({
         />
       )}
       <aside className={`sidebar ${mobileNav ? "mobile-open" : ""}`}>
-        <a className="brand" href="/" aria-label="Assistance">
-          <span className="brand-icon">
-            <Sparkle size={21} />
-          </span>
-          assistance<span className="brand-dot">.</span>
-        </a>
-        <div className="workspace-label">ESPAÇO PESSOAL</div>
-        <nav aria-label="Navegação principal">
-          {[
-            { id: "general", label: "Geral", icon: LayoutDashboard },
-            { id: "studies", label: "Estudos", icon: BookOpen },
-            { id: "statistics", label: "Estatísticas", icon: BarChart3 },
-          ].map(({ id, label, icon: Icon }) => (
+        <div className="sidebar-scroll">
+          <a className="brand" href="/" aria-label="Assistance">
+            <span className="brand-icon">
+              <Sparkle size={21} />
+            </span>
+            assistance<span className="brand-dot">.</span>
+          </a>
+          <div className="workspace-label">ESPAÇO PESSOAL</div>
+          <nav aria-label="Navegação principal">
+            {[
+              { id: "general", label: "Geral", icon: LayoutDashboard },
+              { id: "studies", label: "Estudos", icon: BookOpen },
+              { id: "statistics", label: "Estatísticas", icon: BarChart3 },
+            ].map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                className={`nav-item ${view === id ? "active" : ""}`}
+                aria-current={view === id ? "page" : undefined}
+                onClick={() => navigate(id as View)}
+              >
+                <Icon size={19} />
+                {label}
+                {view === id && <span className="nav-active-dot" />}
+              </button>
+            ))}
+            <div className="nav-divider" />
             <button
-              key={id}
-              className={`nav-item ${view === id ? "active" : ""}`}
-              aria-current={view === id ? "page" : undefined}
-              onClick={() => navigate(id as View)}
+              className={`nav-item ${view === "calendar" ? "active" : ""}`}
+              onClick={() => navigate("calendar")}
             >
-              <Icon size={19} />
-              {label}
-              {view === id && <span className="nav-active-dot" />}
+              <CalendarDays size={19} />
+              Calendário
             </button>
-          ))}
-          <div className="nav-divider" />
-          <button
-            className={`nav-item ${view === "calendar" ? "active" : ""}`}
-            onClick={() => navigate("calendar")}
-          >
-            <CalendarDays size={19} />
-            Calendário
-          </button>
-        </nav>
-        <MiniCalendar date={activeDate} onDate={setDate} />
+          </nav>
+          <MiniCalendar date={activeDate} onDate={setDate} />
+        </div>
         <div className="sidebar-bottom">
           <div className="quiet-note">
             <span className="tiny-dot" /> Um pouco de organização.
@@ -391,22 +428,43 @@ export function Dashboard({
             <Settings2 size={18} />
             Integrações <ArrowUpRight size={15} />
           </button>
-          <div className="profile">
-            <span className="avatar">{name.slice(0, 1)}</span>
-            <div>
-              <strong>{name}</strong>
-              <small>Seu espaço pessoal</small>
-            </div>
-            {signOutAction ? (
-              <form action={signOutAction}>
-                <Button variant="ghost" size="icon" aria-label="Sair">
-                  <LogOut size={17} />
-                </Button>
-              </form>
-            ) : (
-              <span className="profile-preview">LOCAL</span>
-            )}
-          </div>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button className="profile" aria-label="Abrir menu do perfil">
+                <span className="avatar">{name.slice(0, 1)}</span>
+                <div>
+                  <strong>{name}</strong>
+                  <small>Seu espaço pessoal</small>
+                </div>
+                <ChevronUp size={16} />
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                className="profile-menu"
+                side="top"
+                align="start"
+                sideOffset={8}
+                collisionPadding={12}
+              >
+                <DropdownMenu.Item onSelect={() => setProfileOpen(true)}>
+                  <UserRound size={16} /> Perfil
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onSelect={() => setSettings(true)}>
+                  <Settings2 size={16} /> Configurações
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item
+                  disabled={!signOutAction}
+                  onSelect={() => {
+                    void signOutAction?.();
+                  }}
+                >
+                  <LogOut size={16} /> Sair
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
         </div>
       </aside>
       <div className="main-shell">
@@ -1048,6 +1106,7 @@ export function Dashboard({
                   size="sm"
                   onClick={() => {
                     setDeleting(form.entry!);
+                    setDeleteIntegration(true);
                     setForm(null);
                   }}
                 >
@@ -1104,10 +1163,28 @@ export function Dashboard({
         />
       )}
 
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Perfil</DialogTitle>
+            <DialogDescription>
+              Sua conta pessoal no Assistance.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="profile-details">
+            <span className="avatar">{name.slice(0, 1)}</span>
+            <strong>{name}</strong>
+            <p>{email ?? "Prévia local"}</p>
+            <p className="hint">
+              Seu perfil é vinculado à conta Google usada no login.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={settings} onOpenChange={setSettings}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Seu espaço, conectado.</DialogTitle>
+            <DialogTitle>Configurações</DialogTitle>
             <DialogDescription>
               Google cuida dos seus eventos e materiais. Assistance reúne a
               organização.
@@ -1170,10 +1247,28 @@ export function Dashboard({
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir este registro?</AlertDialogTitle>
             <AlertDialogDescription>
-              “{deleting?.title}” será removido do Assistance. Arquivos no Drive
-              serão preservados.
+              “{deleting?.title}” será removido do Assistance.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {(deleting?.googleEventId || deleting?.driveFileId) && (
+            <IntegrationSwitch
+              label={
+                deleting.googleEventId
+                  ? "Excluir também do Google Calendar"
+                  : "Mover também para a lixeira do Google Drive"
+              }
+              checked={deleteIntegration}
+              onCheckedChange={setDeleteIntegration}
+              disabled={mutating}
+              description={
+                deleteIntegration
+                  ? deleting.googleEventId
+                    ? "O evento vinculado também será excluído no Google."
+                    : "O arquivo poderá ser recuperado pela lixeira do Drive."
+                  : "O item no Google será preservado."
+              }
+            />
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={mutating}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
