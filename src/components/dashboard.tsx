@@ -982,8 +982,9 @@ export function Dashboard({
                                   ? "Provas e entregas"
                                   : studyTab === "weekly"
                                     ? "Sua semana de estudos"
-                                    : labels[studyTab as EntryInput["kind"]] +
-                                      (studyTab === "material" ? "is" : "")}
+                                    : studyTab === "material"
+                                      ? "Materiais"
+                                      : labels[studyTab as EntryInput["kind"]]}
                               </h2>
                               <p>
                                 {studyTab === "weekly"

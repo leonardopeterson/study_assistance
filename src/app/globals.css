@@ -2,25 +2,32 @@
 @import "tw-animate-css";
 @custom-variant dark (&:is(.dark *));
 :root {
-  --background: #f8f9f5;
-  --foreground: #26332c;
+  --background: #fafafb;
+  --foreground: #17191c;
   --card: #ffffff;
-  --card-foreground: #26332c;
+  --card-foreground: #17191c;
   --popover: #fff;
-  --popover-foreground: #26332c;
-  --primary: #42674e;
+  --popover-foreground: #17191c;
+  --primary: #17191c;
   --primary-foreground: #fff;
-  --secondary: #edf2e8;
-  --secondary-foreground: #42674e;
-  --muted: #f1f3ed;
-  --muted-foreground: #7a8179;
-  --accent: #edf2e8;
-  --accent-foreground: #42674e;
+  --secondary: #f2f2f3;
+  --secondary-foreground: #17191c;
+  --muted: #f2f2f3;
+  --muted-foreground: #626772;
+  --accent: #fbe1d1;
+  --accent-foreground: #5d2a1a;
   --destructive: #b34842;
-  --border: #e5e8df;
-  --input: #e0e5db;
-  --ring: #739379;
-  --radius: 0.7rem;
+  --border: #17191c14;
+  --input: #17191c24;
+  --ring: #5d2a1a;
+  --radius: 1rem;
+  --surface-glass: #ffffffb3;
+  --surface-glass-strong: #fffffff2;
+  --surface-soft: #ffffff61;
+  --surface-peach: #fbe1d1b8;
+  --display-font: Georgia, "Times New Roman", serif;
+  --shadow-card: 0 4px 18px #17191c04;
+  --shadow-floating: 0 12px 36px #17191c12, 0 2px 6px #17191c06;
 }
 @theme inline {
   --color-background: var(--background);

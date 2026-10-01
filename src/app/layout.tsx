@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./identity.css";
 export const metadata: Metadata = {
   title: "Assistance · Seu dia, com clareza",
   description: "Seu espaço pessoal para organizar a vida e os estudos.",

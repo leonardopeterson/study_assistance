@@ -104,19 +104,26 @@ export function Statistics({ entries }: { entries: Entry[] }) {
           <span className="tag">Dados reais</span>
         </div>
         <div style={{ width: "100%", height: 260, minWidth: 0 }}>
-          <ResponsiveContainer>
+          <ResponsiveContainer width="100%" height={260} minWidth={0}>
             <BarChart data={days}>
               <CartesianGrid
                 strokeDasharray="3 3"
                 vertical={false}
-                stroke="#e9ebe5"
+                stroke="var(--border)"
               />
               <XAxis dataKey="name" tickLine={false} axisLine={false} />
               <YAxis tickLine={false} axisLine={false} />
-              <Tooltip cursor={{ fill: "#f3f5ef" }} />
+              <Tooltip
+                cursor={{ fill: "#17191c05" }}
+                contentStyle={{
+                  borderRadius: 16,
+                  borderColor: "var(--border)",
+                  background: "#fff",
+                }}
+              />
               <Bar
                 dataKey="minutos"
-                fill="#50745d"
+                fill="#5d2a1a"
                 radius={[5, 5, 0, 0]}
                 maxBarSize={42}
               />
