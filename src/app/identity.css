@@ -97,6 +97,9 @@ body {
 .mini-calendar {
   margin-top: 24px;
 }
+.calendar-loading {
+  min-height: 236px;
+}
 .mini-calendar-heading {
   font-size: 12px;
 }

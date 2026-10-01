@@ -416,7 +416,15 @@ export function Dashboard({
               Calendário
             </button>
           </nav>
-          <MiniCalendar date={activeDate} onDate={setDate} />
+          {date ? (
+            <MiniCalendar date={date} onDate={setDate} />
+          ) : (
+            <section
+              className="mini-calendar calendar-loading"
+              aria-label="Carregando calendário"
+              aria-busy="true"
+            />
+          )}
         </div>
         <div className="sidebar-bottom">
           <div className="quiet-note">
