@@ -190,8 +190,8 @@ body {
   color: var(--foreground);
 }
 .main-content {
-  --surface-glass: #ffffff52;
-  --surface-peach: #fbe1d152;
+  --surface-glass: #ffffff29;
+  --surface-peach: #fbe1d129;
   padding-top: 36px;
 }
 .page-heading {
@@ -441,7 +441,7 @@ body {
   background: #ffffffc9;
 }
 .subject-card:hover {
-  background: #ffffff70;
+  background: #ffffff38;
 }
 .deadline > span:nth-child(2) > strong {
   font-size: 12px;
