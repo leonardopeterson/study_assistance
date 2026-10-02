@@ -26,9 +26,13 @@ export async function PUT(req: Request, ctx: Context) {
       throw new AppError("O tipo do registro não pode mudar");
     if (data.subjectId === id) throw new AppError("Matéria inválida");
     await validateSubject(owner, data);
+    const completedDates =
+      data.recurrence === "daily" && previous.recurrence === "daily"
+        ? (previous.completedDates ?? [])
+        : [];
     const [row] = await db()
       .update(entries)
-      .set({ data, updatedAt: new Date() })
+      .set({ data: { ...data, completedDates }, updatedAt: new Date() })
       .where(and(eq(entries.id, id), eq(entries.owner, owner)))
       .returning();
     return toEntry(row);

@@ -24,6 +24,7 @@ import {
   entryInput,
   kinds,
   labels,
+  dayKey,
   priorityLabels,
   statusLabels,
   type Entry,
@@ -101,8 +102,18 @@ export function EntryForm({
               const data = entryInput.parse({
                 ...value,
                 kind: activeKind,
-                startsAt: starts ? new Date(starts).toISOString() : null,
-                endsAt: ends ? new Date(ends).toISOString() : null,
+                startsAt:
+                  value.recurrence === "daily"
+                    ? null
+                    : starts
+                      ? new Date(starts).toISOString()
+                      : null,
+                endsAt:
+                  value.recurrence === "daily"
+                    ? null
+                    : ends
+                      ? new Date(ends).toISOString()
+                      : null,
               });
               if (activeKind === "material" && !initial && integration) {
                 const form = new FormData();
@@ -186,6 +197,39 @@ export function EntryForm({
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+            {["task", "activity", "reminder"].includes(activeKind) && (
+              <div className="full">
+                <IntegrationSwitch
+                  label="Repetir todos os dias"
+                  checked={value.recurrence === "daily"}
+                  onCheckedChange={(checked) =>
+                    setValue((current) => ({
+                      ...current,
+                      recurrence: checked ? "daily" : "none",
+                      recurrenceStartDate: checked
+                        ? (current.recurrenceStartDate ?? dayKey(new Date()))
+                        : null,
+                      status: checked ? "pending" : current.status,
+                    }))
+                  }
+                  description="A rotina aparecerá em Geral todos os dias a partir da data escolhida."
+                />
+              </div>
+            )}
+            {value.recurrence === "daily" && (
+              <div className="full">
+                <Label htmlFor="recurrence-start">Começar em</Label>
+                <Input
+                  id="recurrence-start"
+                  type="date"
+                  required
+                  value={value.recurrenceStartDate ?? ""}
+                  onChange={(event) =>
+                    field("recurrenceStartDate", event.target.value || null)
+                  }
+                />
               </div>
             )}
             {!["subject", "material", "weekly"].includes(activeKind) && (

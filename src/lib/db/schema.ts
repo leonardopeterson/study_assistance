@@ -6,14 +6,14 @@ import {
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
-import type { EntryInput } from "../domain";
+import type { StoredEntryData } from "../domain";
 export const assistance = pgSchema("assistance");
 export const entries = assistance.table(
   "entries",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     owner: text("owner").notNull(),
-    data: jsonb("data").$type<EntryInput>().notNull(),
+    data: jsonb("data").$type<StoredEntryData>().notNull(),
     googleEventId: text("google_event_id"),
     googleEtag: text("google_etag"),
     calendarId: text("calendar_id"),

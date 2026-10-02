@@ -3,10 +3,11 @@ import { and, eq, desc } from "drizzle-orm";
 import { db } from "./db";
 import { entries } from "./db/schema";
 import { AppError } from "./server";
-import type { Entry, EntryInput } from "./domain";
+import { entryInput, type Entry, type EntryInput } from "./domain";
 export function toEntry(row: typeof entries.$inferSelect): Entry {
   return {
-    ...row.data,
+    ...entryInput.parse(row.data),
+    completedDates: row.data.completedDates ?? [],
     id: row.id,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

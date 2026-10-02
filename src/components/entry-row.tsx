@@ -73,16 +73,18 @@ export function EntryRow({
               {subject.title}
             </small>
           )}
-          {item.kind === "weekly"
-            ? `${["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][item.weekday ?? 0]} · ${item.time}`
-            : item.startsAt
-              ? new Date(item.startsAt).toLocaleString("pt-BR", {
-                  day: "2-digit",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : "Sem data"}
+          {item.recurrence === "daily"
+            ? "Rotina diária"
+            : item.kind === "weekly"
+              ? `${["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][item.weekday ?? 0]} · ${item.time}`
+              : item.startsAt
+                ? new Date(item.startsAt).toLocaleString("pt-BR", {
+                    day: "2-digit",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "Sem data"}
           {item.durationMinutes > 0 && ` · ${item.durationMinutes} min`}
         </span>
       </button>

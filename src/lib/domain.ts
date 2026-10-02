@@ -44,6 +44,15 @@ export const statusLabels = {
 };
 export const priorityLabels = { low: "Baixa", medium: "Média", high: "Alta" };
 const iso = z.string().datetime({ offset: true });
+const dateKey = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    return (
+      !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+    );
+  }, "Informe uma data válida");
 export const entryInput = z
   .object({
     kind: z.enum(kinds),
@@ -51,6 +60,8 @@ export const entryInput = z
     notes: z.string().max(5000).default(""),
     priority: z.enum(["low", "medium", "high"]).default("medium"),
     status: z.enum(statuses).default("pending"),
+    recurrence: z.enum(["none", "daily"]).default("none"),
+    recurrenceStartDate: dateKey.nullable().default(null),
     startsAt: iso.nullable().default(null),
     endsAt: iso.nullable().default(null),
     subjectId: z.string().uuid().nullable().default(null),
@@ -65,6 +76,33 @@ export const entryInput = z
     color: z.enum(["sage", "blue", "amber", "rose", "violet"]).default("sage"),
   })
   .superRefine((v, ctx) => {
+    if (v.recurrence === "daily") {
+      if (!["task", "activity", "reminder"].includes(v.kind))
+        ctx.addIssue({
+          code: "custom",
+          path: ["recurrence"],
+          message:
+            "A rotina diária está disponível para tarefas, atividades e lembretes",
+        });
+      if (!v.recurrenceStartDate)
+        ctx.addIssue({
+          code: "custom",
+          path: ["recurrenceStartDate"],
+          message: "Informe quando a rotina começa",
+        });
+      if (v.status !== "pending")
+        ctx.addIssue({
+          code: "custom",
+          path: ["status"],
+          message: "A conclusão da rotina é acompanhada por dia",
+        });
+    } else if (v.recurrenceStartDate) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["recurrenceStartDate"],
+        message: "A data inicial só se aplica a uma rotina diária",
+      });
+    }
     if (v.endsAt && (!v.startsAt || new Date(v.endsAt) <= new Date(v.startsAt)))
       ctx.addIssue({
         code: "custom",
@@ -104,6 +142,7 @@ export const entryInput = z
       });
   });
 export type EntryInput = z.infer<typeof entryInput>;
+export type StoredEntryData = EntryInput & { completedDates?: string[] };
 export type Entry = EntryInput & {
   id: string;
   updatedAt: string;
@@ -114,14 +153,25 @@ export type Entry = EntryInput & {
   syncedAt: string | null;
   driveFileId: string | null;
   driveUrl: string | null;
+  completedDates?: string[];
+  occurrenceDate?: string;
 };
 export const actionable = (e: Entry) =>
   !["subject", "material", "weekly"].includes(e.kind);
-export const isOverdue = (e: Entry, now = new Date()) =>
-  actionable(e) &&
-  !!e.startsAt &&
-  new Date(e.endsAt ?? e.startsAt) < now &&
-  !["completed", "cancelled"].includes(e.status);
+export const isOverdue = (e: Entry, now = new Date()) => {
+  if (e.recurrence === "daily" && e.occurrenceDate)
+    return (
+      actionable(e) &&
+      e.occurrenceDate < dayKey(now) &&
+      !["completed", "cancelled"].includes(e.status)
+    );
+  return (
+    actionable(e) &&
+    !!e.startsAt &&
+    new Date(e.endsAt ?? e.startsAt) < now &&
+    !["completed", "cancelled"].includes(e.status)
+  );
+};
 export const dayKey = (date: Date | string, timezone = "America/Sao_Paulo") =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -132,36 +182,106 @@ export const dayKey = (date: Date | string, timezone = "America/Sao_Paulo") =>
 export function metrics(entries: Entry[], date = new Date()) {
   const day = dayKey(date);
   const tasks = entries.filter(actionable).filter((e) => e.kind !== "session");
-  const today = tasks.filter((e) => e.startsAt && dayKey(e.startsAt) === day);
+  const oneOffTasks = tasks.filter((e) => e.recurrence !== "daily");
+  const routines = tasks.filter((e) => e.recurrence === "daily");
+  const activeRoutinesToday = routines.filter(
+    (e) => !!e.recurrenceStartDate && e.recurrenceStartDate <= day,
+  );
+  const today = oneOffTasks.filter(
+    (e) => e.startsAt && dayKey(e.startsAt) === day,
+  );
   const sessions = entries.filter(
     (e) => e.kind === "session" && e.status === "completed",
   );
-  const completed = tasks.filter((e) => e.status === "completed").length;
-  const todayCompleted = today.filter((e) => e.status === "completed").length;
-  const start = new Date(date);
-  start.setDate(start.getDate() - 6);
-  const week = tasks.filter(
+  const todayCompleted =
+    today.filter((e) => e.status === "completed").length +
+    activeRoutinesToday.filter((e) => (e.completedDates ?? []).includes(day))
+      .length;
+  const weekStart = shiftDay(day, -6);
+  const week = oneOffTasks.filter(
     (e) =>
       e.startsAt &&
-      dayKey(e.startsAt) >= dayKey(start) &&
+      dayKey(e.startsAt) >= weekStart &&
       dayKey(e.startsAt) <= day,
   );
+  const routineWeek = weekDays(day).flatMap((routineDay) =>
+    routines
+      .filter(
+        (e) => !!e.recurrenceStartDate && e.recurrenceStartDate <= routineDay,
+      )
+      .map((e) => ({
+        ...e,
+        status: (e.completedDates ?? []).includes(routineDay)
+          ? ("completed" as const)
+          : ("pending" as const),
+      })),
+  );
+  const routineOccurrences = routines.reduce(
+    (sum, e) =>
+      sum + (e.recurrenceStartDate ? dayCount(e.recurrenceStartDate, day) : 0),
+    0,
+  );
+  const routineCompletions = routines.reduce((sum, e) => {
+    const startDate = e.recurrenceStartDate;
+    if (!startDate) return sum;
+    return (
+      sum +
+      (e.completedDates ?? []).filter(
+        (completedDay) => completedDay <= day && completedDay >= startDate,
+      ).length
+    );
+  }, 0);
+  const overdueRoutines = routines.reduce((sum, e) => {
+    if (!e.recurrenceStartDate) return sum;
+    const startDate = e.recurrenceStartDate;
+    const throughYesterday = shiftDay(day, -1);
+    const pastOccurrences = dayCount(startDate, throughYesterday);
+    const completed = (e.completedDates ?? []).filter(
+      (completedDay) => completedDay >= startDate && completedDay < day,
+    ).length;
+    return sum + Math.max(0, pastOccurrences - completed);
+  }, 0);
+  const todayTotal = today.length + activeRoutinesToday.length;
+  const completed =
+    oneOffTasks.filter((e) => e.status === "completed").length +
+    routineCompletions;
   return {
-    total: tasks.length,
+    total: oneOffTasks.length + routineOccurrences,
     completed,
-    todayTotal: today.length,
+    todayTotal,
     todayCompleted,
-    todayPercent: today.length
-      ? Math.round((todayCompleted / today.length) * 100)
+    todayPercent: todayTotal
+      ? Math.round((todayCompleted / todayTotal) * 100)
       : 0,
-    weekPercent: week.length
-      ? Math.round(
-          (week.filter((e) => e.status === "completed").length / week.length) *
-            100,
-        )
-      : 0,
+    weekPercent:
+      week.length + routineWeek.length
+        ? Math.round(
+            ((week.filter((e) => e.status === "completed").length +
+              routineWeek.filter((e) => e.status === "completed").length) /
+              (week.length + routineWeek.length)) *
+              100,
+          )
+        : 0,
     studyMinutes: sessions.reduce((sum, e) => sum + e.durationMinutes, 0),
     sessions: sessions.length,
-    overdue: tasks.filter((e) => isOverdue(e, date)).length,
+    overdue:
+      oneOffTasks.filter((e) => isOverdue(e, date)).length + overdueRoutines,
   };
+}
+
+function shiftDay(day: string, amount: number) {
+  const shifted = new Date(`${day}T12:00:00.000Z`);
+  shifted.setUTCDate(shifted.getUTCDate() + amount);
+  return shifted.toISOString().slice(0, 10);
+}
+
+function dayCount(start: string, end: string) {
+  if (start > end) return 0;
+  const from = new Date(`${start}T00:00:00.000Z`).getTime();
+  const to = new Date(`${end}T00:00:00.000Z`).getTime();
+  return Math.floor((to - from) / 86_400_000) + 1;
+}
+
+function weekDays(day: string) {
+  return Array.from({ length: 7 }, (_, index) => shiftDay(day, index - 6));
 }

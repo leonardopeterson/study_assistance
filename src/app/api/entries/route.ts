@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     await validateSubject(owner, data);
     const [row] = await db()
       .insert(entries)
-      .values({ owner, data })
+      .values({ owner, data: { ...data, completedDates: [] } })
       .returning();
     return toEntry(row);
   });

@@ -92,6 +92,7 @@ function localEntry(data: EntryInput, id = crypto.randomUUID()): Entry {
     syncedAt: null,
     driveFileId: null,
     driveUrl: null,
+    completedDates: [],
   };
 }
 
@@ -154,7 +155,15 @@ export function Dashboard({
     if (preview) {
       try {
         const raw = localStorage.getItem("assistance:preview:entries:v1");
-        if (raw) setItems(JSON.parse(raw));
+        if (raw) {
+          const stored = JSON.parse(raw) as Entry[];
+          setItems(
+            stored.map((item) => ({
+              ...item,
+              completedDates: item.completedDates ?? [],
+            })),
+          );
+        }
       } catch {
         setError("Os dados locais não puderam ser carregados");
       }
@@ -193,11 +202,28 @@ export function Dashboard({
   );
   const daily = visible
     .filter(actionable)
-    .filter(
-      (e) =>
-        e.kind !== "session" &&
-        (!e.startsAt || dayKey(e.startsAt) === selectedDay),
-    )
+    .filter((e) => e.kind !== "session")
+    .flatMap((entry) => {
+      if (entry.recurrence === "daily") {
+        if (
+          !entry.recurrenceStartDate ||
+          entry.recurrenceStartDate > selectedDay
+        )
+          return [];
+        return [
+          {
+            ...entry,
+            occurrenceDate: selectedDay,
+            status: (entry.completedDates ?? []).includes(selectedDay)
+              ? ("completed" as const)
+              : ("pending" as const),
+          },
+        ];
+      }
+      return !entry.startsAt || dayKey(entry.startsAt) === selectedDay
+        ? [entry]
+        : [];
+    })
     .filter(
       (e) =>
         filter === "all" ||
@@ -280,6 +306,41 @@ export function Dashboard({
     if (mutating) return;
     setMutating(true);
     try {
+      if (item.recurrence === "daily" && item.occurrenceDate) {
+        if (preview) {
+          setItems((previous) =>
+            previous.map((entry) => {
+              if (entry.id !== item.id) return entry;
+              const dates = entry.completedDates ?? [];
+              const completedDates = dates.includes(item.occurrenceDate!)
+                ? dates.filter((date) => date !== item.occurrenceDate)
+                : [...dates, item.occurrenceDate!].sort();
+              return {
+                ...entry,
+                completedDates,
+                updatedAt: new Date().toISOString(),
+              };
+            }),
+          );
+        } else {
+          const updated = await request(`/api/entries/${item.id}/occurrences`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ date: item.occurrenceDate }),
+          });
+          setItems((previous) =>
+            previous.map((entry) =>
+              entry.id === updated.id ? updated : entry,
+            ),
+          );
+        }
+        setNotice(
+          item.status === "completed"
+            ? "Rotina reaberta neste dia"
+            : "Rotina concluída neste dia",
+        );
+        return;
+      }
       await save(
         entryInput.parse({
           ...item,
